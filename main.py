@@ -568,18 +568,36 @@ class DataFetcher:
                             # 限制描述长度，最多200字符
                             if len(description) > 200:
                                 description = description[:200] + "..."
+                        
+                        # 获取热点分数（优先顺序：hot > hotScore > heat > score > hotValue）
+                        # 如果没有，则根据排名计算：排名越靠前（数字越小）分数越高
+                        hot_score = item.get("hot") or item.get("hotScore") or item.get("heat") or item.get("score") or item.get("hotValue")
+                        if hot_score is None:
+                            # 根据排名计算热点分数：排名1=100分，排名2=95分，以此类推
+                            # 公式：100 - (index - 1) * 5，最低0分
+                            hot_score = max(0, 100 - (index - 1) * 5)
+                        else:
+                            try:
+                                hot_score = float(hot_score)
+                            except (ValueError, TypeError):
+                                hot_score = max(0, 100 - (index - 1) * 5)
 
                         if title in results[id_value]:
                             results[id_value][title]["ranks"].append(index)
                             # 如果已有描述但新描述更长，则更新
                             if description and (not results[id_value][title].get("description") or len(description) > len(results[id_value][title].get("description", ""))):
                                 results[id_value][title]["description"] = description
+                            # 更新热点分数（取最高分）
+                            existing_hot = results[id_value][title].get("hot_score", 0)
+                            if hot_score > existing_hot:
+                                results[id_value][title]["hot_score"] = hot_score
                         else:
                             results[id_value][title] = {
                                 "ranks": [index],
                                 "url": url,
                                 "mobileUrl": mobile_url,
                                 "description": description,
+                                "hot_score": hot_score,
                             }
                 except json.JSONDecodeError:
                     print(f"解析 {id_value} 响应失败")
@@ -847,6 +865,7 @@ def process_source_data(
             url = data.get("url", "")
             mobile_url = data.get("mobileUrl", "")
             description = data.get("description", "")
+            hot_score = data.get("hot_score", 0)
 
             title_info[source_id][title] = {
                 "first_time": time_info,
@@ -856,6 +875,7 @@ def process_source_data(
                 "url": url,
                 "mobileUrl": mobile_url,
                 "description": description,
+                "hot_score": hot_score,
             }
     else:
         for title, data in title_data.items():
@@ -863,14 +883,17 @@ def process_source_data(
             url = data.get("url", "")
             mobile_url = data.get("mobileUrl", "")
             description = data.get("description", "")
+            hot_score = data.get("hot_score", 0)
 
             if title not in all_results[source_id]:
                 description = data.get("description", "")
+                hot_score = data.get("hot_score", 0)
                 all_results[source_id][title] = {
                     "ranks": ranks,
                     "url": url,
                     "mobileUrl": mobile_url,
                     "description": description,
+                    "hot_score": hot_score,
                 }
                 title_info[source_id][title] = {
                     "first_time": time_info,
@@ -880,6 +903,7 @@ def process_source_data(
                     "url": url,
                     "mobileUrl": mobile_url,
                     "description": description,
+                    "hot_score": hot_score,
                 }
             else:
                 existing_data = all_results[source_id][title]
@@ -893,11 +917,13 @@ def process_source_data(
                         merged_ranks.append(rank)
 
                 existing_description = existing_data.get("description", "")
+                existing_hot = existing_data.get("hot_score", 0)
                 all_results[source_id][title] = {
                     "ranks": merged_ranks,
                     "url": existing_url or url,
                     "mobileUrl": existing_mobile_url or mobile_url,
                     "description": existing_description or description,
+                    "hot_score": max(existing_hot, hot_score),
                 }
 
                 title_info[source_id][title]["last_time"] = time_info
@@ -909,6 +935,10 @@ def process_source_data(
                     title_info[source_id][title]["mobileUrl"] = mobile_url
                 if not title_info[source_id][title].get("description"):
                     title_info[source_id][title]["description"] = description
+                # 更新热点分数（取最高分）
+                existing_hot = title_info[source_id][title].get("hot_score", 0)
+                if hot_score > existing_hot:
+                    title_info[source_id][title]["hot_score"] = hot_score
 
 
 def detect_latest_new_titles(current_platform_ids: Optional[List[str]] = None) -> Dict:
@@ -1220,6 +1250,7 @@ def count_word_frequency(
             source_url = title_data.get("url", "")
             source_mobile_url = title_data.get("mobileUrl", "")
             source_description = title_data.get("description", "")
+            source_hot_score = title_data.get("hot_score", 0)
 
             # 找到匹配的词组（防御性转换确保类型安全）
             title_lower = str(title).lower() if not isinstance(title, str) else title.lower()
@@ -1263,6 +1294,7 @@ def count_word_frequency(
                 url = source_url
                 mobile_url = source_mobile_url
                 description = source_description
+                hot_score = source_hot_score
 
                 # 对于 current 模式，从历史统计信息中获取完整数据
                 if (
@@ -1280,6 +1312,7 @@ def count_word_frequency(
                     url = info.get("url", source_url)
                     mobile_url = info.get("mobileUrl", source_mobile_url)
                     description = info.get("description", description)
+                    hot_score = info.get("hot_score", hot_score)
                 elif (
                     title_info
                     and source_id in title_info
@@ -1294,6 +1327,7 @@ def count_word_frequency(
                     url = info.get("url", source_url)
                     mobile_url = info.get("mobileUrl", source_mobile_url)
                     description = info.get("description", description)
+                    hot_score = info.get("hot_score", hot_score)
 
                 if not ranks:
                     ranks = [99]
@@ -1325,6 +1359,7 @@ def count_word_frequency(
                         "url": url,
                         "mobileUrl": mobile_url,
                         "description": description,
+                        "hot_score": hot_score,
                         "is_new": is_new,
                     }
                 )
@@ -1480,6 +1515,7 @@ def prepare_report_data(
                     mobile_url = title_data.get("mobileUrl", "")
                     ranks = title_data.get("ranks", [])
                     description = title_data.get("description", "")
+                    hot_score = title_data.get("hot_score", 0)
 
                     processed_title = {
                         "title": title,
@@ -1491,6 +1527,7 @@ def prepare_report_data(
                         "url": url,
                         "mobile_url": mobile_url,
                         "description": description,
+                        "hot_score": hot_score,
                         "is_new": True,
                     }
                     source_titles.append(processed_title)
@@ -1521,6 +1558,7 @@ def prepare_report_data(
                 "url": title_data.get("url", ""),
                 "mobile_url": title_data.get("mobileUrl", ""),
                 "description": title_data.get("description", ""),
+                "hot_score": title_data.get("hot_score", 0),
                 "is_new": title_data.get("is_new", False),
             }
             processed_titles.append(processed_title)
@@ -1637,6 +1675,23 @@ def format_title_for_platform(
 
         if rank_display:
             result += f" {rank_display}"
+        
+        # 添加热点分数（如果存在）
+        hot_score = title_data.get("hot_score", 0)
+        if hot_score > 0:
+            # 格式化热点分数，保留整数
+            hot_display = int(hot_score)
+            # 根据分数显示不同的emoji
+            if hot_score >= 80:
+                hot_emoji = "🔥🔥🔥"
+            elif hot_score >= 60:
+                hot_emoji = "🔥🔥"
+            elif hot_score >= 40:
+                hot_emoji = "🔥"
+            else:
+                hot_emoji = "📈"
+            result += f" {hot_emoji}<b>{hot_display}</b>"
+        
         if title_data["time_display"]:
             result += f" <code>- {title_data['time_display']}</code>"
         if title_data["count"] > 1:
@@ -4615,6 +4670,7 @@ class NewsAnalyzer:
                 url = title_data.get("url", "")
                 mobile_url = title_data.get("mobileUrl", "")
                 description = title_data.get("description", "")
+                hot_score = title_data.get("hot_score", 0)
 
                 title_info[source_id][title] = {
                     "first_time": time_info,
@@ -4624,6 +4680,7 @@ class NewsAnalyzer:
                     "url": url,
                     "mobileUrl": mobile_url,
                     "description": description,
+                    "hot_score": hot_score,
                 }
         return title_info
 
