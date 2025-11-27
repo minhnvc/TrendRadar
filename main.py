@@ -561,14 +561,25 @@ class DataFetcher:
                         title = str(title).strip()
                         url = item.get("url", "")
                         mobile_url = item.get("mobileUrl", "")
+                        # 获取描述信息（优先顺序：description > summary > content）
+                        description = item.get("description") or item.get("summary") or item.get("content") or ""
+                        if description:
+                            description = str(description).strip()
+                            # 限制描述长度，最多200字符
+                            if len(description) > 200:
+                                description = description[:200] + "..."
 
                         if title in results[id_value]:
                             results[id_value][title]["ranks"].append(index)
+                            # 如果已有描述但新描述更长，则更新
+                            if description and (not results[id_value][title].get("description") or len(description) > len(results[id_value][title].get("description", ""))):
+                                results[id_value][title]["description"] = description
                         else:
                             results[id_value][title] = {
                                 "ranks": [index],
                                 "url": url,
                                 "mobileUrl": mobile_url,
+                                "description": description,
                             }
                 except json.JSONDecodeError:
                     print(f"解析 {id_value} 响应失败")
@@ -835,6 +846,7 @@ def process_source_data(
             ranks = data.get("ranks", [])
             url = data.get("url", "")
             mobile_url = data.get("mobileUrl", "")
+            description = data.get("description", "")
 
             title_info[source_id][title] = {
                 "first_time": time_info,
@@ -843,18 +855,22 @@ def process_source_data(
                 "ranks": ranks,
                 "url": url,
                 "mobileUrl": mobile_url,
+                "description": description,
             }
     else:
         for title, data in title_data.items():
             ranks = data.get("ranks", [])
             url = data.get("url", "")
             mobile_url = data.get("mobileUrl", "")
+            description = data.get("description", "")
 
             if title not in all_results[source_id]:
+                description = data.get("description", "")
                 all_results[source_id][title] = {
                     "ranks": ranks,
                     "url": url,
                     "mobileUrl": mobile_url,
+                    "description": description,
                 }
                 title_info[source_id][title] = {
                     "first_time": time_info,
@@ -863,6 +879,7 @@ def process_source_data(
                     "ranks": ranks,
                     "url": url,
                     "mobileUrl": mobile_url,
+                    "description": description,
                 }
             else:
                 existing_data = all_results[source_id][title]
@@ -875,10 +892,12 @@ def process_source_data(
                     if rank not in merged_ranks:
                         merged_ranks.append(rank)
 
+                existing_description = existing_data.get("description", "")
                 all_results[source_id][title] = {
                     "ranks": merged_ranks,
                     "url": existing_url or url,
                     "mobileUrl": existing_mobile_url or mobile_url,
+                    "description": existing_description or description,
                 }
 
                 title_info[source_id][title]["last_time"] = time_info
@@ -888,6 +907,8 @@ def process_source_data(
                     title_info[source_id][title]["url"] = url
                 if not title_info[source_id][title].get("mobileUrl"):
                     title_info[source_id][title]["mobileUrl"] = mobile_url
+                if not title_info[source_id][title].get("description"):
+                    title_info[source_id][title]["description"] = description
 
 
 def detect_latest_new_titles(current_platform_ids: Optional[List[str]] = None) -> Dict:
@@ -1198,6 +1219,7 @@ def count_word_frequency(
             source_ranks = title_data.get("ranks", [])
             source_url = title_data.get("url", "")
             source_mobile_url = title_data.get("mobileUrl", "")
+            source_description = title_data.get("description", "")
 
             # 找到匹配的词组（防御性转换确保类型安全）
             title_lower = str(title).lower() if not isinstance(title, str) else title.lower()
@@ -1240,6 +1262,7 @@ def count_word_frequency(
                 ranks = source_ranks if source_ranks else []
                 url = source_url
                 mobile_url = source_mobile_url
+                description = source_description
 
                 # 对于 current 模式，从历史统计信息中获取完整数据
                 if (
@@ -1256,6 +1279,7 @@ def count_word_frequency(
                         ranks = info["ranks"]
                     url = info.get("url", source_url)
                     mobile_url = info.get("mobileUrl", source_mobile_url)
+                    description = info.get("description", description)
                 elif (
                     title_info
                     and source_id in title_info
@@ -1269,6 +1293,7 @@ def count_word_frequency(
                         ranks = info["ranks"]
                     url = info.get("url", source_url)
                     mobile_url = info.get("mobileUrl", source_mobile_url)
+                    description = info.get("description", description)
 
                 if not ranks:
                     ranks = [99]
@@ -1299,6 +1324,7 @@ def count_word_frequency(
                         "rank_threshold": rank_threshold,
                         "url": url,
                         "mobileUrl": mobile_url,
+                        "description": description,
                         "is_new": is_new,
                     }
                 )
@@ -1453,6 +1479,7 @@ def prepare_report_data(
                     url = title_data.get("url", "")
                     mobile_url = title_data.get("mobileUrl", "")
                     ranks = title_data.get("ranks", [])
+                    description = title_data.get("description", "")
 
                     processed_title = {
                         "title": title,
@@ -1463,6 +1490,7 @@ def prepare_report_data(
                         "rank_threshold": CONFIG["RANK_THRESHOLD"],
                         "url": url,
                         "mobile_url": mobile_url,
+                        "description": description,
                         "is_new": True,
                     }
                     source_titles.append(processed_title)
@@ -1492,6 +1520,7 @@ def prepare_report_data(
                 "rank_threshold": title_data["rank_threshold"],
                 "url": title_data.get("url", ""),
                 "mobile_url": title_data.get("mobileUrl", ""),
+                "description": title_data.get("description", ""),
                 "is_new": title_data.get("is_new", False),
             }
             processed_titles.append(processed_title)
@@ -1612,6 +1641,13 @@ def format_title_for_platform(
             result += f" <code>- {title_data['time_display']}</code>"
         if title_data["count"] > 1:
             result += f" <code>({title_data['count']}次)</code>"
+        
+        # 添加描述信息（如果存在）
+        description = title_data.get("description", "")
+        if description:
+            # 转义HTML特殊字符
+            escaped_description = html_escape(description)
+            result += f"\n<i>{escaped_description}</i>"
 
         return result
 
@@ -4578,6 +4614,7 @@ class NewsAnalyzer:
                 ranks = title_data.get("ranks", [])
                 url = title_data.get("url", "")
                 mobile_url = title_data.get("mobileUrl", "")
+                description = title_data.get("description", "")
 
                 title_info[source_id][title] = {
                     "first_time": time_info,
@@ -4586,6 +4623,7 @@ class NewsAnalyzer:
                     "ranks": ranks,
                     "url": url,
                     "mobileUrl": mobile_url,
+                    "description": description,
                 }
         return title_info
 
