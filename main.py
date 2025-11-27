@@ -253,7 +253,7 @@ print(f"监控平台数量: {len(CONFIG['PLATFORMS'])}")
 # === 工具函数 ===
 def get_beijing_time():
     """获取北京时间"""
-    return datetime.now(pytz.timezone("Asia/Shanghai"))
+    return datetime.now(pytz.timezone("Asia/Ho_Chi_Minh"))
 
 
 def format_date_folder():
@@ -386,7 +386,7 @@ class PushRecordManager:
             try:
                 date_str = record_file.stem.replace("push_record_", "")
                 file_date = datetime.strptime(date_str, "%Y%m%d")
-                file_date = pytz.timezone("Asia/Shanghai").localize(file_date)
+                file_date = pytz.timezone("Asia/Ho_Chi_Minh").localize(file_date)
 
                 if (current_time - file_date).days > retention_days:
                     record_file.unlink()
@@ -3819,12 +3819,27 @@ def summarize_with_deepseek(
         if proxy_url:
             proxies = {"http": proxy_url, "https": proxy_url}
         
-        prompt = f"""Hãy tổng hợp và chuẩn hóa nội dung tin tức sau đây thành tiếng Việt. 
-Giữ nguyên cấu trúc và định dạng HTML, chỉ dịch và chuẩn hóa nội dung sang tiếng Việt tự nhiên.
-Giữ nguyên các thẻ HTML như <b>, </b>, <code>, </code>, và các link.
+        prompt = f"""Bạn là một chuyên gia tổng hợp tin tức cho Telegram. Hãy xử lý nội dung tin tức sau đây:
 
-Nội dung:
-{content}"""
+YÊU CẦU:
+1. Dịch và tổng hợp nội dung sang tiếng Việt tự nhiên, dễ đọc
+2. Làm gọn gàng, loại bỏ thông tin dư thừa, giữ lại những điểm quan trọng nhất
+3. Tối ưu định dạng cho Telegram:
+   - Sử dụng <b>text</b> cho tiêu đề quan trọng
+   - Sử dụng <code>text</code> cho số liệu, tên công ty, sản phẩm
+   - Giữ nguyên các link nhưng làm cho ngắn gọn hơn nếu có thể
+   - Thêm emoji phù hợp để dễ đọc (🔥, 📈, 📌, 🆕, ⚠️)
+4. Cấu trúc rõ ràng, dễ quét mắt:
+   - Nhóm các tin tức liên quan lại với nhau
+   - Sử dụng khoảng trắng hợp lý để phân tách các phần
+   - Làm cho tiêu đề nổi bật và dễ nhận biết
+5. Làm cho nội dung thân thiện, tự nhiên như đang kể chuyện
+6. Giữ nguyên số lượng tin tức nhưng có thể tóm tắt nội dung cho ngắn gọn hơn
+
+Nội dung cần xử lý:
+{content}
+
+Hãy trả về nội dung đã được tối ưu, gọn gàng và thân thiện cho Telegram."""
         
         payload = {
             "model": "deepseek-chat",
@@ -3866,6 +3881,35 @@ Nội dung:
         return None
 
 
+def split_text_into_batches(text: str, max_bytes: int = 4000) -> List[str]:
+    """将文本按字节大小分割成多个批次"""
+    batches = []
+    current_batch = ""
+    current_size = 0
+    
+    # 按行分割，保持行的完整性
+    lines = text.split('\n')
+    
+    for line in lines:
+        line_with_newline = line + '\n'
+        line_size = len(line_with_newline.encode('utf-8'))
+        
+        if current_size + line_size > max_bytes and current_batch:
+            # 当前批次已满，保存并开始新批次
+            batches.append(current_batch.rstrip('\n'))
+            current_batch = line_with_newline
+            current_size = line_size
+        else:
+            current_batch += line_with_newline
+            current_size += line_size
+    
+    # 添加最后一批
+    if current_batch:
+        batches.append(current_batch.rstrip('\n'))
+    
+    return batches if batches else [text]
+
+
 def send_to_telegram(
     bot_token: str,
     chat_id: str,
@@ -3883,16 +3927,33 @@ def send_to_telegram(
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
 
-    # 获取分批内容
-    batches = split_content_into_batches(
-        report_data, "telegram", update_info, mode=mode
-    )
-
-    print(f"Telegram消息分为 {len(batches)} 批次发送 [{report_type}]")
-
     # 检查是否启用DeepSeek汇总
     deepseek_api_key = CONFIG.get("DEEPSEEK_API_KEY", "")
     use_deepseek = bool(deepseek_api_key)
+
+    # 先获取完整内容（不分割）
+    full_batches = split_content_into_batches(
+        report_data, "telegram", update_info, max_bytes=1000000, mode=mode
+    )
+    full_content = "\n\n".join(full_batches)
+
+    # 使用DeepSeek汇总和标准化内容（如果启用）
+    if use_deepseek:
+        print(f"Đang tổng hợp toàn bộ nội dung bằng DeepSeek... [{report_type}]")
+        summarized_content = summarize_with_deepseek(
+            full_content, deepseek_api_key, proxy_url
+        )
+        if summarized_content:
+            full_content = summarized_content
+            print(f"DeepSeek tổng hợp thành công [{report_type}]")
+        else:
+            print(f"DeepSeek汇总失败，使用原始内容 [{report_type}]")
+    
+    # 将汇总后的内容分割成批次
+    max_bytes = CONFIG.get("MESSAGE_BATCH_SIZE", 4000)
+    batches = split_text_into_batches(full_content, max_bytes=max_bytes)
+
+    print(f"Telegram消息分为 {len(batches)} 批次发送 [{report_type}]")
 
     # 逐批发送
     for i, batch_content in enumerate(batches, 1):
@@ -3901,19 +3962,9 @@ def send_to_telegram(
             f"发送Telegram第 {i}/{len(batches)} 批次，大小：{batch_size} 字节 [{report_type}]"
         )
 
-        # 使用DeepSeek汇总和标准化内容（如果启用）
-        if use_deepseek:
-            summarized_content = summarize_with_deepseek(
-                batch_content, deepseek_api_key, proxy_url
-            )
-            if summarized_content:
-                batch_content = summarized_content
-            else:
-                print(f"DeepSeek汇总失败，使用原始内容发送第 {i} 批次")
-
         # 添加批次标识
         if len(batches) > 1:
-            batch_header = f"<b>Tin tức {i}/{len(batches)}]</b>\n\n"
+            batch_header = f"<b>Tin tức [{i}/{len(batches)}]</b>\n\n"
             batch_content = batch_header + batch_content
 
         payload = {
