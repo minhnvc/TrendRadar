@@ -203,8 +203,9 @@ def load_config():
     )
 
     # DeepSeek配置
-    config["DEEPSEEK_API_KEY"] = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-    config["ENABLE_DEEPSEEK"] = os.environ.get("ENABLE_DEEPSEEK", "").strip().lower() in ("true", "1")
+    config["DEEPSEEK_API_KEY"] = os.environ.get("DEEPSEEK_API_KEY", "").strip() or webhooks.get(
+        "deepseek_api_key", ""
+    )
 
     # 输出配置来源信息
     notification_sources = []
@@ -2726,13 +2727,6 @@ def render_feishu_content(
     """渲染飞书内容"""
     text_content = ""
 
-    # 如果存在DeepSeek处理后的内容，优先使用
-    if report_data.get("deepseek_content"):
-        text_content += f"🤖 **AI Tổng hợp Tin Trending**\n\n"
-        text_content += f"{report_data['deepseek_content']}\n\n"
-        text_content += f"{CONFIG['FEISHU_MESSAGE_SEPARATOR']}\n\n"
-        text_content += f"📊 **Chi tiết Tin Tức Gốc**\n\n"
-
     if report_data["stats"]:
         text_content += f"📊 **热点词汇统计**\n\n"
 
@@ -2830,13 +2824,6 @@ def render_dingtalk_content(
     text_content += f"**类型：** 热点分析报告\n\n"
 
     text_content += "---\n\n"
-
-    # 如果存在DeepSeek处理后的内容，优先使用
-    if report_data.get("deepseek_content"):
-        text_content += f"🤖 **AI Tổng hợp Tin Trending**\n\n"
-        text_content += f"{report_data['deepseek_content']}\n\n"
-        text_content += "---\n\n"
-        text_content += f"📊 **Chi tiết Tin Tức Gốc**\n\n"
 
     if report_data["stats"]:
         text_content += f"📊 **热点词汇统计**\n\n"
@@ -2939,20 +2926,6 @@ def split_content_into_batches(
     )
     now = get_beijing_time()
 
-    # 如果存在DeepSeek处理后的内容，添加到header
-    deepseek_header = ""
-    if report_data.get("deepseek_content"):
-        if format_type == "wework":
-            deepseek_header = f"🤖 **AI Tổng hợp Tin Trending**\n\n{report_data['deepseek_content']}\n\n\n\n---\n\n📊 **Chi tiết Tin Tức Gốc**\n\n"
-        elif format_type == "telegram":
-            deepseek_header = f"🤖 <b>AI Tổng hợp Tin Trending</b>\n\n{report_data['deepseek_content']}\n\n---\n\n📊 <b>Chi tiết Tin Tức Gốc</b>\n\n"
-        elif format_type == "ntfy":
-            deepseek_header = f"🤖 **AI Tổng hợp Tin Trending**\n\n{report_data['deepseek_content']}\n\n---\n\n📊 **Chi tiết Tin Tức Gốc**\n\n"
-        elif format_type == "feishu":
-            deepseek_header = f"🤖 **AI Tổng hợp Tin Trending**\n\n{report_data['deepseek_content']}\n\n{CONFIG['FEISHU_MESSAGE_SEPARATOR']}\n\n📊 **Chi tiết Tin Tức Gốc**\n\n"
-        elif format_type == "dingtalk":
-            deepseek_header = f"🤖 **AI Tổng hợp Tin Trending**\n\n{report_data['deepseek_content']}\n\n---\n\n📊 **Chi tiết Tin Tức Gốc**\n\n"
-
     base_header = ""
     if format_type == "wework":
         base_header = f"**总新闻数：** {total_titles}\n\n\n\n"
@@ -2967,10 +2940,6 @@ def split_content_into_batches(
         base_header += f"**时间：** {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         base_header += f"**类型：** 热点分析报告\n\n"
         base_header += "---\n\n"
-    
-    # 将DeepSeek内容添加到header
-    if deepseek_header:
-        base_header = deepseek_header + base_header
 
     base_footer = ""
     if format_type == "wework":
@@ -3015,12 +2984,6 @@ def split_content_into_batches(
         and not report_data["new_titles"]
         and not report_data["failed_ids"]
     ):
-        # 如果只有DeepSeek内容，直接返回
-        if report_data.get("deepseek_content"):
-            final_content = base_header + base_footer
-            batches.append(final_content)
-            return batches
-        
         if mode == "incremental":
             mode_text = "增量模式下暂无新增匹配的热点词汇"
         elif mode == "current":
@@ -3405,151 +3368,6 @@ def split_content_into_batches(
     return batches
 
 
-def format_content_for_deepseek(report_data: Dict, mode: str = "daily") -> str:
-    """格式化报告数据为纯文本，用于发送给DeepSeek处理"""
-    content = ""
-    
-    if report_data["stats"]:
-        content += "📊 热点词汇统计\n\n"
-        
-        for i, stat in enumerate(report_data["stats"], 1):
-            word = stat["word"]
-            count = stat["count"]
-            
-            if count >= 10:
-                content += f"🔥 [{i}] {word}: {count} 条\n\n"
-            elif count >= 5:
-                content += f"📈 [{i}] {word}: {count} 条\n\n"
-            else:
-                content += f"📌 [{i}] {word}: {count} 条\n\n"
-            
-            for j, title_data in enumerate(stat["titles"], 1):
-                title = title_data["title"]
-                source = title_data["source_name"]
-                ranks = title_data.get("ranks", [])
-                rank_display = f"[{min(ranks)}]" if ranks else ""
-                count_info = f"({title_data['count']}次)" if title_data.get("count", 1) > 1 else ""
-                
-                content += f"  {j}. [{source}] {title} {rank_display} {count_info}\n"
-            
-            content += "\n"
-    
-    if report_data["new_titles"]:
-        content += f"\n🆕 本次新增热点新闻 (共 {report_data['total_new_count']} 条)\n\n"
-        
-        for source_data in report_data["new_titles"]:
-            content += f"{source_data['source_name']} ({len(source_data['titles'])} 条):\n"
-            
-            for j, title_data in enumerate(source_data["titles"], 1):
-                title = title_data["title"]
-                ranks = title_data.get("ranks", [])
-                rank_display = f"[{min(ranks)}]" if ranks else ""
-                content += f"  {j}. {title} {rank_display}\n"
-            
-            content += "\n"
-    
-    return content
-
-
-def process_with_deepseek(
-    content: str,
-    api_key: str,
-    proxy_url: Optional[str] = None,
-    max_retries: int = 2,
-) -> Optional[str]:
-    """使用DeepSeek API处理内容，汇总并标准化为越南语趋势新闻"""
-    if not api_key:
-        print("DeepSeek API key未配置，跳过AI处理")
-        return None
-    
-    url = "https://api.deepseek.com/v1/chat/completions"
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-    
-    proxies = None
-    if proxy_url:
-        proxies = {"http": proxy_url, "https": proxy_url}
-    
-    prompt = f"""Bạn là một biên tập viên chuyên nghiệp. Hãy phân tích và tổng hợp các tin tức trending sau đây, sau đó viết lại thành một bản tin trending tiếng Việt ngắn gọn, súc tích và hấp dẫn.
-
-Yêu cầu:
-1. Tổng hợp các tin tức thành các chủ đề chính
-2. Viết lại bằng tiếng Việt tự nhiên, dễ hiểu
-3. Giữ nguyên thông tin quan trọng (số liệu, tên người/tổ chức, sự kiện)
-4. Format: Tiêu đề chủ đề → Tóm tắt nội dung (2-3 câu)
-5. Sắp xếp theo mức độ quan trọng/nóng hổi
-6. Tổng độ dài khoảng 300-500 từ
-
-Nội dung tin tức:
-{content}
-
-Hãy viết bản tin trending tiếng Việt:"""
-    
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 2000,
-    }
-    
-    retries = 0
-    while retries <= max_retries:
-        try:
-            print(f"正在调用DeepSeek API处理内容... (尝试 {retries + 1}/{max_retries + 1})")
-            response = requests.post(
-                url,
-                headers=headers,
-                json=payload,
-                proxies=proxies,
-                timeout=60
-            )
-            response.raise_for_status()
-            
-            result = response.json()
-            
-            if "choices" in result and len(result["choices"]) > 0:
-                processed_content = result["choices"][0]["message"]["content"]
-                print(f"DeepSeek API处理成功，返回内容长度: {len(processed_content)} 字符")
-                return processed_content
-            else:
-                print(f"DeepSeek API响应格式异常: {result}")
-                return None
-                
-        except requests.exceptions.Timeout:
-            retries += 1
-            if retries <= max_retries:
-                wait_time = retries * 2
-                print(f"DeepSeek API请求超时，{wait_time}秒后重试...")
-                time.sleep(wait_time)
-            else:
-                print("DeepSeek API请求超时，已达到最大重试次数")
-                return None
-                
-        except requests.exceptions.RequestException as e:
-            retries += 1
-            if retries <= max_retries:
-                wait_time = retries * 2
-                print(f"DeepSeek API请求失败: {e}，{wait_time}秒后重试...")
-                time.sleep(wait_time)
-            else:
-                print(f"DeepSeek API请求失败，已达到最大重试次数: {e}")
-                return None
-                
-        except Exception as e:
-            print(f"DeepSeek API处理出错: {e}")
-            return None
-    
-    return None
-
-
 def send_to_notifications(
     stats: List[Dict],
     failed_ids: Optional[List] = None,
@@ -3584,30 +3402,6 @@ def send_to_notifications(
                 print(f"推送窗口控制：今天首次推送")
 
     report_data = prepare_report_data(stats, failed_ids, new_titles, id_to_name, mode)
-
-    # 如果是汇总报告且启用了DeepSeek，先处理内容
-    is_summary_report = report_type in ["当日汇总", "当前榜单汇总"]
-    deepseek_processed_content = None
-    
-    if (
-        is_summary_report
-        and CONFIG.get("ENABLE_DEEPSEEK", False)
-        and CONFIG.get("DEEPSEEK_API_KEY")
-    ):
-        print(f"正在使用DeepSeek处理{report_type}内容...")
-        original_content = format_content_for_deepseek(report_data, mode)
-        deepseek_processed_content = process_with_deepseek(
-            original_content,
-            CONFIG["DEEPSEEK_API_KEY"],
-            proxy_url,
-        )
-        
-        if deepseek_processed_content:
-            print("DeepSeek处理完成，将使用处理后的内容发送通知")
-            # 将处理后的内容添加到report_data中
-            report_data["deepseek_content"] = deepseek_processed_content
-        else:
-            print("DeepSeek处理失败，将使用原始内容发送通知")
 
     feishu_url = CONFIG["FEISHU_WEBHOOK_URL"]
     dingtalk_url = CONFIG["DINGTALK_WEBHOOK_URL"]
@@ -4004,6 +3798,74 @@ def send_to_wework(
     return True
 
 
+def summarize_with_deepseek(
+    content: str,
+    api_key: str,
+    proxy_url: Optional[str] = None,
+) -> Optional[str]:
+    """使用DeepSeek API汇总和标准化内容为越南语"""
+    if not api_key:
+        return None
+    
+    try:
+        url = "https://api.deepseek.com/v1/chat/completions"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        proxies = None
+        if proxy_url:
+            proxies = {"http": proxy_url, "https": proxy_url}
+        
+        prompt = f"""Hãy tổng hợp và chuẩn hóa nội dung tin tức sau đây thành tiếng Việt. 
+Giữ nguyên cấu trúc và định dạng HTML, chỉ dịch và chuẩn hóa nội dung sang tiếng Việt tự nhiên.
+Giữ nguyên các thẻ HTML như <b>, </b>, <code>, </code>, và các link.
+
+Nội dung:
+{content}"""
+        
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 4000
+        }
+        
+        print("Đang gửi nội dung tới DeepSeek để tổng hợp và chuẩn hóa...")
+        response = requests.post(
+            url, headers=headers, json=payload, proxies=proxies, timeout=60
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if "choices" in result and len(result["choices"]) > 0:
+                summarized_content = result["choices"][0]["message"]["content"]
+                print("DeepSeek tổng hợp thành công")
+                return summarized_content
+            else:
+                print(f"DeepSeek API响应格式异常: {result}")
+                return None
+        else:
+            print(f"DeepSeek API请求失败，状态码: {response.status_code}")
+            try:
+                error_detail = response.json()
+                print(f"错误详情: {error_detail}")
+            except:
+                print(f"错误响应: {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"DeepSeek API调用出错: {e}")
+        return None
+
+
 def send_to_telegram(
     bot_token: str,
     chat_id: str,
@@ -4013,7 +3875,7 @@ def send_to_telegram(
     proxy_url: Optional[str] = None,
     mode: str = "daily",
 ) -> bool:
-    """发送到Telegram（支持分批发送）"""
+    """发送到Telegram（支持分批发送，支持DeepSeek汇总）"""
     headers = {"Content-Type": "application/json"}
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
@@ -4028,12 +3890,26 @@ def send_to_telegram(
 
     print(f"Telegram消息分为 {len(batches)} 批次发送 [{report_type}]")
 
+    # 检查是否启用DeepSeek汇总
+    deepseek_api_key = CONFIG.get("DEEPSEEK_API_KEY", "")
+    use_deepseek = bool(deepseek_api_key)
+
     # 逐批发送
     for i, batch_content in enumerate(batches, 1):
         batch_size = len(batch_content.encode("utf-8"))
         print(
             f"发送Telegram第 {i}/{len(batches)} 批次，大小：{batch_size} 字节 [{report_type}]"
         )
+
+        # 使用DeepSeek汇总和标准化内容（如果启用）
+        if use_deepseek:
+            summarized_content = summarize_with_deepseek(
+                batch_content, deepseek_api_key, proxy_url
+            )
+            if summarized_content:
+                batch_content = summarized_content
+            else:
+                print(f"DeepSeek汇总失败，使用原始内容发送第 {i} 批次")
 
         # 添加批次标识
         if len(batches) > 1:
