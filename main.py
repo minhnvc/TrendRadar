@@ -3821,18 +3821,17 @@ def summarize_with_deepseek(
 
 YÊU CẦU:
 1. Dịch và tổng hợp nội dung sang tiếng Việt tự nhiên, dễ đọc
-2. Làm gọn gàng, loại bỏ thông tin dư thừa, giữ lại những điểm quan trọng nhất
-3. Tối ưu định dạng cho Telegram:
+2. Tối ưu định dạng cho Telegram:
    - Sử dụng <b>text</b> cho tiêu đề quan trọng
    - Sử dụng <code>text</code> cho số liệu, tên công ty, sản phẩm
    - Giữ nguyên các link nhưng làm cho ngắn gọn hơn nếu có thể
    - Thêm emoji phù hợp để dễ đọc (🔥, 📈, 📌, 🆕, ⚠️)
-4. Cấu trúc rõ ràng, dễ quét mắt:
+3. Cấu trúc rõ ràng, dễ quét mắt:
    - Nhóm các tin tức liên quan lại với nhau
    - Sử dụng khoảng trắng hợp lý để phân tách các phần
    - Làm cho tiêu đề nổi bật và dễ nhận biết
-5. Làm cho nội dung thân thiện, tự nhiên như đang kể chuyện
-6. Giữ nguyên số lượng tin tức nhưng có thể tóm tắt nội dung cho ngắn gọn hơn
+4. Làm cho nội dung thân thiện, tự nhiên như đang kể chuyện
+5. Giữ nguyên số lượng tin tức
 
 Nội dung cần xử lý:
 {content}

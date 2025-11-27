@@ -9,7 +9,7 @@ Z世代
 Gen Z
 !广告
 !培训
-@3
+@5
 
 国内
 国内新闻
@@ -18,7 +18,7 @@ Gen Z
 热搜
 !广告
 !推广
-@3
+@5
 
 # 2. AI, AI model, Deepseek, Robot
 DeepSeek
@@ -26,7 +26,7 @@ DeepSeek
 deepseek
 DeepSeek-V3
 DeepSeek-R1
-@3
+@7
 
 ai
 人工智能
@@ -36,7 +36,7 @@ AI模型
 LLM
 AGI
 通用人工智能
-@3
+@7
 
 chatgpt
 openai
@@ -44,23 +44,23 @@ sora
 GPT
 GPT-4
 GPT-5
-@3
+@7
 
 claude
 Anthropic
-@3
+@7
 
 gemini
 deepmind
 Google AI
-@3
+@7
 
 机器人
 机器人技术
 人形机器人
 !广告
 !培训
-@3
+@7
 
 # 3. Công nghệ, lập trình, IT
 科技
@@ -76,7 +76,7 @@ IT
 信息技术
 !广告
 !培训
-@3
+@5
 
 芯片
 光刻机
@@ -84,12 +84,12 @@ IT
 处理器
 CPU
 GPU
-@3
+@5
 
 自动驾驶
 无人驾驶
 智能驾驶
-@3
+@5
 
 # 4. Các công ty công nghệ lớn quốc tế và Trung Quốc
 # Công ty công nghệ Trung Quốc
@@ -97,60 +97,60 @@ GPU
 鸿蒙
 HarmonyOS
 任正非
-@3
+@6
 
 比亚迪
 王传福
-@3
+@6
 
 大疆
 DJI
-@3
+@6
 
 宇树
 王兴兴
-@3
+@6
 
 智元
 灵犀
 稚晖君
 彭志辉
-@3
+@6
 
 京东
 刘强东
-@3
+@6
 
 字节
 bytedance
 张一鸣
 抖音
 TikTok
-@3
+@6
 
 # Công ty công nghệ quốc tế
 特斯拉
 Tesla
 马斯克
 Musk
-@3
+@6
 
 微软
 Microsoft
-@3
+@6
 
 英伟达
 NVIDIA
 黄仁勋
-@3
+@6
 
 AMD
-@3
+@6
 
 谷歌
 google
 Alphabet
-@3
+@6
 
 iphone
 ipad
@@ -159,4 +159,4 @@ ios
 Apple
 苹果
 !水果
-@3
+@6
