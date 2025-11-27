@@ -2948,8 +2948,6 @@ def split_content_into_batches(
             base_footer += f"\n> TrendRadar 发现新版本 **{update_info['remote_version']}**，当前 **{update_info['current_version']}**"
     elif format_type == "telegram":
         base_footer = f"\n\n更新时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
-        if update_info:
-            base_footer += f"\nTrendRadar 发现新版本 {update_info['remote_version']}，当前 {update_info['current_version']}"
     elif format_type == "ntfy":
         base_footer = f"\n\n> 更新时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
         if update_info:
@@ -4073,7 +4071,7 @@ def send_to_email(
 
         # 添加纯文本部分（作为备选）
         text_content = f"""
-TrendRadar 热点分析报告
+m1nh.dev 热点分析报告
 ========================
 报告类型：{report_type}
 生成时间：{now.strftime('%Y-%m-%d %H:%M:%S')}
