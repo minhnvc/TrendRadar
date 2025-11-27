@@ -3913,7 +3913,7 @@ def send_to_telegram(
 
         # 添加批次标识
         if len(batches) > 1:
-            batch_header = f"<b>[第 {i}/{len(batches)} 批次]</b>\n\n"
+            batch_header = f"<b>Tin tức {i}/{len(batches)}]</b>\n\n"
             batch_content = batch_header + batch_content
 
         payload = {
