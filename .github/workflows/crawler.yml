@@ -1,9 +1,9 @@
 name: Hot News Crawler
 on:
   schedule:
-    - cron: "0 7 * * *"   # 7h sáng
-    - cron: "0 12 * * *"   # 12h trưa
-    - cron: "0 21 * * *"   # 9h tối
+    - cron: "0 0 * * *"   # 7h sáng (UTC 0:00 = GMT+7 7:00)
+    - cron: "0 5 * * *"   # 12h trưa (UTC 5:00 = GMT+7 12:00)
+    - cron: "0 14 * * *"   # 9h tối (UTC 14:00 = GMT+7 21:00)
   workflow_dispatch:
 
 concurrency:
