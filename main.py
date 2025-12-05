@@ -584,10 +584,8 @@ class DataFetcher:
 
                         if title in results[id_value]:
                             results[id_value][title]["ranks"].append(index)
-                            # 如果已有描述但新描述更长，则更新
                             if description and (not results[id_value][title].get("description") or len(description) > len(results[id_value][title].get("description", ""))):
                                 results[id_value][title]["description"] = description
-                            # 更新热点分数（取最高分）
                             existing_hot = results[id_value][title].get("hot_score", 0)
                             if hot_score > existing_hot:
                                 results[id_value][title]["hot_score"] = hot_score
